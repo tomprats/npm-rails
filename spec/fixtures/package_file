@@ -6,3 +6,4 @@ end
 
 npm 'development-packages', development: true
 npm 'package-with-build-name', build_name: "PackageBuildName"
+set 'Fun', "development-packages"
