@@ -4,12 +4,13 @@ module Npm
 
       def self.build(root_path, package_file, env)
         package_file_path = "#{ root_path }/#{ package_file }"
-        packages = PackageFileParser.parse(package_file_path)
-        new(packages, root_path, env)
+        result = PackageFileParser.parse(package_file_path)
+        new(result[:packages], result[:exports], root_path, env)
       end
 
-      def initialize(packages, root_path, env)
+      def initialize(packages, exports, root_path, env)
         @packages = packages
+        @exports = exports
         @root_path = root_path
         @env = env
       end
@@ -18,7 +19,7 @@ module Npm
         bundle_file_path = "#{ @root_path }/tmp/npm-rails/bundle.js"
         FileUtils.mkdir_p("tmp/npm-rails")
         File.open(bundle_file_path, "w") do |file|
-          packages_for_bundle_file.each do |package|
+          packages_for(:bundle).each do |package|
             file.write "window.#{ package.build_name } = require('#{ package.name }')\n"
           end
         end
@@ -27,27 +28,20 @@ module Npm
 
       # Return string of packages for 'npm install' command
       def to_npm_format
-        @packages.inject "" do |string, package|
-          # do not add development packages in production environment
-          if (@env.production? and package.development?)
-            string
-          else
-            string << "#{ package.name }@\"#{ package.version }\" "
-          end
+        packages_for(:npm).inject "" do |string, package|
+          string << "#{ package.name }@\"#{ package.version }\" "
         end
       end
 
       private
 
-      def packages_for_bundle_file
+      def packages_for(kind)
+        packages = kind == :npm ? @packages : @exports
+
         if @env.production?
-          @packages.select do |package|
-            package.should_require? && !package.development?
-          end
+          packages.select { |package| !package.development? }
         else
-          @packages.select do |package|
-            package.should_require?
-          end
+          packages
         end
       end
     end
